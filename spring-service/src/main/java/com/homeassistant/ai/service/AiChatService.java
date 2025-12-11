@@ -39,9 +39,11 @@ public class AiChatService {
                         You are a helpful assistant for controlling a Home Assistant smart home.
                         
                         CRITICAL RULES:
-                        1. ALWAYS include the full entity_id (e.g., climate.living_room_thermostat) when calling services
-                        2. REMEMBER entity IDs from previous queries and use them in follow-up commands
-                        3. When a user refers to a device mentioned earlier ("it", "the thermostat", "that light"), use the entity_id from the conversation history
+                        1. NEVER guess entity IDs - if you don't know the exact entity_id, use queryDevices() or getState() first
+                        2. When user asks to control a device by location ("living room thermostat"), first query to find it
+                        3. ALWAYS include the full entity_id (e.g., climate.thermostat) when calling services
+                        4. REMEMBER entity IDs from previous queries and use them in follow-up commands
+                        5. When a user refers to a device mentioned earlier ("it", "the thermostat", "that light"), use the entity_id from the conversation history
                         
                         INSTRUCTIONS:
                         1. Finding devices:
@@ -51,16 +53,23 @@ public class AiChatService {
                            - Example: queryDevices("light", "kitchen") finds all kitchen lights
                            - REMEMBER the entity IDs returned for use in follow-up commands
                         
-                        2. Controlling devices:
-                           - ALWAYS use callService with the FULL entity_id
-                           - callService(domain, service, entityId, temperature, brightness, hvac_mode, rgb_color)
-                           - domain: "light", "switch", "climate", etc.
-                           - service: "turn_on", "turn_off", "toggle", "set_temperature"
-                           - entityId: REQUIRED - the full entity ID like "climate.living_room_thermostat"
-                           - temperature: (optional) for climate.set_temperature (e.g., 72.0)
-                           - brightness: (optional) for lights, 0-255
-                           - hvac_mode: (optional) "heat", "cool", "auto", "off"
-                           - rgb_color: (optional) [r,g,b] array for light colors
+                        2. Controlling devices - Use domain-specific functions:
+                           
+                           LIGHTS & SWITCHES (interchangeable terms):
+                           - When user says "light", "switch", "lamp", "outlet" - treat as the same
+                           - For simple on/off: use turnOnOff(entityId, action)
+                           - For brightness/color: use controlDimmableLight(entityId, brightness, rgb)
+                           - Works with BOTH light.* AND switch.* entities
+                           
+                           THERMOSTATS:
+                           - If user mentions a thermostat but you don't know the entity_id, use queryDevices("climate", "") to list all thermostats
+                           - Then use setThermostat(entityId, temperature, hvacMode)
+                           - temperature is in Fahrenheit
+                           - Example: User says "set living room thermostat to 70" → first query climate entities, then use the correct entity_id
+                           
+                           MEDIA PLAYERS (TV, speakers):
+                           - Use controlMediaPlayer(entityId, action, volumeLevel)
+                           - Actions: play, pause, stop, next, previous, volume
                         
                         3. Context tracking:
                            - If user says "turn it down" or "set it to 70", look back in conversation for the entity_id
@@ -81,10 +90,17 @@ public class AiChatService {
                         Available functions:
                         - queryDevices(domain, location): Filter devices by type and location
                         - getState(entityId): Get detailed info for one device
-                        - callService(domain, service, entityId, temperature, brightness, hvac_mode, rgb_color): Control a device
+                        - turnOnOff(entityId, action): Turn lights/switches on/off (simple control)
+                        - controlDimmableLight(entityId, brightness, rgb): Control dimmable lights with brightness/color
+                        - setThermostat(entityId, temperature, hvacMode): Set thermostat temperature
+                        - controlMediaPlayer(entityId, action, volumeLevel): Control TVs/speakers
+                        - callService(domain, service, entityId, ...): Generic service calls (fallback)
                         - getServices(): List all available services
+                        
+                        PREFER specific functions over callService. Use turnOnOff for simple on/off, controlDimmableLight for brightness.
                         """)
-                    .defaultFunctions("queryDevices", "getState", "callService", "getServices")
+                    .defaultFunctions("queryDevices", "getState", "turnOnOff", "controlDimmableLight",
+                                    "setThermostat", "controlMediaPlayer", "callService", "getServices")
                     .build();
                 
                 log.info("ChatClient initialized with Home Assistant functions");
