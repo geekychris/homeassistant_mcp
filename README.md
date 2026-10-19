@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Homeassistant MCP logo" width="180">
+</p>
+
 # Home Assistant MCP Server & AI Control Service
 
 A comprehensive solution for controlling Home Assistant with AI, featuring:
